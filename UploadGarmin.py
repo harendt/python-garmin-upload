@@ -23,8 +23,11 @@ try:
 	import simplejson
 except ImportError:
 	import json as simplejson
+import json
 import os.path
 
+BaseUrl = 'https://connect.garmin.com/'
+UserService = BaseUrl + 'proxy/user-service-1.0/json/'
 
 """
 Upload Garmin
@@ -33,52 +36,64 @@ Handle operation to open to Garmin
 """
 class UploadGarmin:
 
+	userId = -1
+	userName = ""
+
 	def __init__(self):
+		# see: http://docs.python.org/2/library/urllib2.html#urllib2.build_opener
 		self.opener = urllib2.build_opener(
 				urllib2.HTTPCookieProcessor(),
 				MultipartPostHandler.MultipartPostHandler)
+		# see: http://docs.python.org/2/library/urllib2.html#urllib2.install_opener
 		urllib2.install_opener(self.opener)
 
 	"""
 	Login to garmin
 
-	@ivar username: Garmin USERNAME
+	@ivar username: Garmin User Name
 	@type username: str
-	@ivar password: Garmin PASSWORD
+	@ivar password: Garmin Password
 	@type password: str
 	"""
-	def login(self, username, password):
+	def signIn(self, user, password):
+		try:
+			# it seems that all of the following parameters are required for a
+			# successful login
+			params = {
+					'login' : 'login',
+					'login:loginUsernameField' : user,
+					'login:password' : password,
+					'login:signInButton' : 'Sign In',
+					'javax.faces.ViewState' : 'j_id1'
+			}
+			params = urllib.urlencode(params)
 
-		params = {
-				'javax.faces.ViewState': 'j_id1',
-				'login': 'login',
-				'login:loginUsernameField' : username,
-				'login:password': password,
-				'login:signInButton': 'Sign In'
-		}
-		params = urllib.urlencode(params)
+			# open the sign in page once
+			self.opener.open(BaseUrl + 'signin').read()
 
-		#GO Figure out!
-		self.opener.open('https://connect.garmin.com/signin').read()
+			# send login parameters
+			self.opener.open(BaseUrl + 'signin', params)
 
-		status = self.opener.open('https://connect.garmin.com/signin', params)
-		vary_header = status.headers['vary']
-		status.close()
+			# read the current username (if login succeeds this returns a JSON with
+			# the username -- something like {"username":"fred"}; otherwise this
+			# returns {"username":""})
+			output = self.opener.open(BaseUrl + 'user/username')
+			output = json.loads(output.read())
 
-		#dlotton - If login succeeds this returns a JSON with the username
-		# something like {"username":"fred"}
-		json = self.opener.open('http://connect.garmin.com/user/username').read().strip()
+			if output['username'] != '':
+				output = self.opener.open(UserService + 'account')
+				output = json.loads(output.read())
+				self.userId = int(output['account']['userId'])
+				self.userName = output['account']['username']
+				print 'Signed in as user "%s" (ID: %d)' % (self.userName, self.userId)
+				return True
+			else:
+				print 'Sign in as user "%s" failed' % user
+				return False
 
-		# Uncomment for debugging
-		#print '\tLogin_Username: ' + username
-		#print '\tJSON: ' + json
-		#print '\tJSON_Username: ' + simplejson.loads(json)['username']
-
-		if simplejson.loads(json)['username'] != '':
-			return(True)
-		else:
-			return(False)
-
+		except BaseException as e:
+			print 'Sign in failed unexpectedly: %s' % str(e)
+			return False
 
 	"""
 	Upload a File

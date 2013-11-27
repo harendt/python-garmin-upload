@@ -1,39 +1,38 @@
-"""
-Upload Garmin
+#!/usr/bin/python
+#
+# Copyright (c) 2010, Chmouel Boudjnah <chmouel@chmouel.com>
+# Copyright (c) 2012, David Lotton <yellow56@gmail.com>
+# Copyright (c) 2013, Bastian Harendt <b.harendt@gmail.com>
+# 
+# All rights reserved.
+# 
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+# 
+# 1. Redistributions of source code must retain the above copyright notice,
+# this list of conditions and the following disclaimer.
+# 
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+# 
+# 3. The names of the copyright holders and contributors may not be used to
+# endorse or promote products derived from this software without specific prior
+# written permission.
+# 
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
 
-Handle the operation to upload to the Garmin Connect Website.
-
-Copyright (c) 2010, Chmouel Boudjnah <chmouel@chmouel.com>
-Copyright (c) 2012, David Lotton <yellow56@gmail.com>
-Copyright (c) 2013, Bastian Harendt <b.harendt@gmail.com>
-
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-this list of conditions and the following disclaimer in the documentation
-and/or other materials provided with the distribution.
-
-3. The names of the copyright holders and contributors may not be used to
-endorse or promote products derived from this software without specific prior
-written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-"""
+"""Upload activities to Garmin Connect."""
 
 import urllib2
 import urllib
@@ -49,12 +48,8 @@ BaseUrl = 'https://connect.garmin.com/'
 UserService = BaseUrl + 'proxy/user-service-1.0/json/'
 UploadService = BaseUrl + 'proxy/upload-service-1.1/json/'
 
-"""
-Upload Garmin
-
-Handle operation to open to Garmin
-"""
 class UploadGarmin:
+	"""Interface to upload activities to Garmin Connect."""
 
 	userId = -1
 	userName = ''
@@ -67,15 +62,16 @@ class UploadGarmin:
 		# see: http://docs.python.org/2/library/urllib2.html#urllib2.install_opener
 		urllib2.install_opener(self.opener)
 
-	"""
-	Login to garmin
-
-	@ivar username: Garmin User Name
-	@type username: str
-	@ivar password: Garmin Password
-	@type password: str
-	"""
 	def signIn(self, user, password):
+		"""Sign in to Garmin Connect.
+
+		This is required to upload activities.
+
+		@ivar username: Garmin User Name
+		@type username: str
+		@ivar password: Garmin Password
+		@type password: str
+		"""
 		# it seems that all of the following parameters are required for a
 		# successful login
 		params = {
@@ -122,15 +118,14 @@ class UploadGarmin:
 			return False
 
 
-	"""
-	Upload a File
-
-	You need to be logged already
-
-	@ivar uploadFile: The TCX, GPX, or FIT file name to upload
-	@type uploadFile: str
-	"""
 	def uploadFile(self, filename):
+		"""Upload a file to Garmin Connect.
+
+		You need to be signed in already.
+
+		@ivar uploadFile: The TCX, GPX, or FIT file name to upload
+		@type uploadFile: str
+		"""
 		# Split the filename into root and extension
 		# see: http://docs.python.org/2/library/os.path.html#os.path.splitext
 		fileExtension = os.path.splitext(filename)[1].lower()
@@ -179,10 +174,9 @@ class UploadGarmin:
 
 
 	def upload_tcx(self, tcx_file):
-		"""
-		Upload a TCX File
+		"""Upload a TCX file.
 
-		You need to be logged already
+		You need to be logged already.
 
 		@ivar tcx_file: The TCX file name to upload
 		@type tcx_file: str
@@ -201,17 +195,16 @@ class UploadGarmin:
 
 		return simplejson.loads(json)["detailedImportResult"]["successes"][0]["internalId"]
 
-	"""
-	Name a Workout
-
-	Note: You need to be logged already
-
-	@ivar workout_id: Workout ID to rename
-	@type workout_id: int
-	@ivar workout_name: New workout name
-	@type workout_name: str
-	"""
 	def name_workout(self, workout_id, workout_name):
+		"""Name a workout.
+
+		You need to be logged already.
+
+		@ivar workout_id: Workout ID to rename
+		@type workout_id: int
+		@ivar workout_name: New workout name
+		@type workout_name: str
+		"""
 		params = dict(value=workout_name)
 		params = urllib.urlencode(params)
 		output = self.opener.open('http://connect.garmin.com/proxy/activity-service-1.0/json/name/%d' % (workout_id), params)
@@ -221,13 +214,12 @@ class UploadGarmin:
 		if simplejson.loads(json)["display"]["value"] != workout_name:
 			raise Exception("Naming workout has failed")
 
-	"""
-	Get the Workout URL
-
-	@ivar workout_id: Workout ID
-	@type workout_id: int
-	"""
 	def workout_url(self, workout_id):
+		"""Get the workout URL.
+
+		@ivar workout_id: Workout ID
+		@type workout_id: int
+		"""
 		return "http://connect.garmin.com/activity/" % (int(workout_id))
 
 if __name__ == '__main__':

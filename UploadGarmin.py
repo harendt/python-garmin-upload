@@ -43,10 +43,57 @@ except ImportError:
 	import json as simplejson
 import json
 import os.path
+import datetime
+import re
+import pytz
+
+# just for testing
+from pprint import pprint
 
 BaseUrl = 'https://connect.garmin.com/'
 UserService = BaseUrl + 'proxy/user-service-1.0/json/'
 UploadService = BaseUrl + 'proxy/upload-service-1.1/json/'
+ActivitySearchService = BaseUrl + 'proxy/activity-search-service-1.2/json/'
+
+class Activity:
+
+	@staticmethod
+	def extractTime(data, prefix):
+		prefix = prefix.capitalize()
+		if prefix not in ['Begin', 'End']:
+			raise Exception('invalid prefix specified')
+		timestamp = data['activitySummary'][prefix + 'Timestamp']
+		items = re.match(
+				'(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}).(\d{3})Z',
+				timestamp['value'])
+		time = datetime.datetime(
+				year        = int(items.group(1)),
+				month       = int(items.group(2)),
+				day         = int(items.group(3)),
+				hour        = int(items.group(4)),
+				minute      = int(items.group(5)),
+				second      = int(items.group(6)),
+				microsecond = int(items.group(7))*1000,
+				tzinfo      = pytz.utc)
+		time = time.astimezone(pytz.timezone(timestamp['uom']))
+		return time
+
+	@staticmethod
+	def extractCoordinates(data, prefix):
+		prefix = prefix.capitalize()
+		if prefix not in ['Begin', 'End']:
+			raise Exception('invalid prefix specified')
+		latitude  = float(data['activitySummary'][prefix+'Latitude']['value'])
+		longitude = float(data['activitySummary'][prefix+'Longitude']['value'])
+		return (latitude, longitude)
+
+	def __init__(self, data):
+		self.activityId       = data['activityId']
+		self.activityType     = data['activityType']['key']
+		self.beginTime        = self.extractTime(data, 'begin')
+		self.endTime          = self.extractTime(data, 'end'  )
+		self.beginCoordinates = self.extractCoordinates(data, 'begin')
+		self.endCoordinates   = self.extractCoordinates(data, 'end')
 
 class UploadGarmin:
 	"""Interface to upload activities to Garmin Connect."""
@@ -140,7 +187,7 @@ class UploadGarmin:
 			openMode = 'r'
 
 		params = {
-			"data" : open(filename, openMode)
+			'data' : open(filename, openMode)
 		}
 
 		print 'Uploading file "%s"' % filename
@@ -172,6 +219,33 @@ class UploadGarmin:
 		print 'Upload failed unexpectedly'
 		return False, -1
 
+	def getActivities(self):
+		"""Retrieve a list of activities."""
+		activities = []
+		limit = 50
+		start = 0
+		while True:
+			output = self.opener.open(ActivitySearchService + 'activities?limit=%d&start=%d' % (limit, start))
+			output = json.loads(output.read())
+			if len(output['results']['activities']) > 0:
+				for item in output['results']['activities']:
+#					pprint(item['activity'])
+					activities.append(Activity(item['activity']))
+			else:
+				break
+			start += limit
+		return activities
+
+	def printActivities(self):
+		activities = self.getActivities()
+		for (index, activity) in enumerate(activities):
+			print '%d: Id = %d, Type = %s, Time = %s, Coordinates = (%5.5f, %5.5f)' % (
+					index,
+					activity.activityId,
+					activity.activityType,
+					activity.beginTime,
+					activity.beginCoordinates[0],
+					activity.beginCoordinates[1])
 
 	def upload_tcx(self, tcx_file):
 		"""Upload a TCX file.
@@ -221,6 +295,7 @@ class UploadGarmin:
 		@type workout_id: int
 		"""
 		return "http://connect.garmin.com/activity/" % (int(workout_id))
+
 
 if __name__ == '__main__':
 	g = UploadGarmin()

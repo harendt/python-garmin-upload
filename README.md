@@ -13,6 +13,12 @@ See the headers of the respective files for details about licensing.
 * MultipartPostHandler.py: LGPL
 
 
+Requirements
+------------
+
+pytz
+
+
 Example
 -------
 

@@ -247,28 +247,6 @@ class UploadGarmin:
 					activity.beginCoordinates[0],
 					activity.beginCoordinates[1])
 
-	def upload_tcx(self, tcx_file):
-		"""Upload a TCX file.
-
-		You need to be logged already.
-
-		@ivar tcx_file: The TCX file name to upload
-		@type tcx_file: str
-		"""
-		params = {
-			"responseContentType" : "text%2Fhtml",
-			"data" : open(tcx_file)
-		}
-
-		#dlotton - added '.tcx' to the end of the URI below
-		output = self.opener.open('http://connect.garmin.com/proxy/upload-service-1.1/json/upload/.tcx', params)
-		if output.code != 200:
-			raise Exception("Error while uploading")
-		json = output.read()
-		output.close()
-
-		return simplejson.loads(json)["detailedImportResult"]["successes"][0]["internalId"]
-
 	def name_workout(self, workout_id, workout_name):
 		"""Name a workout.
 
@@ -295,11 +273,3 @@ class UploadGarmin:
 		@type workout_id: int
 		"""
 		return "http://connect.garmin.com/activity/" % (int(workout_id))
-
-
-if __name__ == '__main__':
-	g = UploadGarmin()
-	g.login("username", "password")
-	wId = g.upload_tcx('/tmp/a.tcx')
-	wInfo = g.upload_file('/tmp/a.tcx')
-	g.name_workout(wId, "TestWorkout")

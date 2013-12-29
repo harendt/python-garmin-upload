@@ -54,8 +54,57 @@ BaseUrl = 'https://connect.garmin.com/'
 UserService = BaseUrl + 'proxy/user-service-1.0/json/'
 UploadService = BaseUrl + 'proxy/upload-service-1.1/json/'
 ActivitySearchService = BaseUrl + 'proxy/activity-search-service-1.2/json/'
+ActivityService = BaseUrl + 'proxy/activity-service-1.3/json/'
 
 class Activity:
+
+	def __init__(self, activityId = None, activityData = None):
+		# retrieve activity data from activity id
+		if activityData is None:
+			output = urllib2.urlopen(ActivitySearchService + 'activities?activityId=%d&limit=1&start=0' % activityId)
+			output = json.loads(output.read())
+			if len(output['results']['activities']) == 0:
+				raise Exception('Could not retrieve data for activity id %d' % activityId)
+			activityData = output['results']['activities'][0]['activity']
+
+		# general information
+		self.activityId   = int(activityData['activityId'])
+		self.activityType = activityData['activityType']['key']
+		self.name         = activityData['activityName']
+
+		# begin and end time
+		self.beginTime = self.extractTime(activityData, 'begin')
+		self.endTime   = self.extractTime(activityData, 'end'  )
+
+		# begin and end coordinates (latitude and longitude)
+		self.beginCoordinates = self.extractCoordinates(activityData, 'begin')
+		self.endCoordinates   = self.extractCoordinates(activityData, 'end')
+
+		# distance in kilometers and duration in seconds
+		self.distance = float(activityData['activitySummary']['SumDistance']['value'])
+		self.duration = float(activityData['activitySummary']['SumDuration']['value'])
+
+
+	@classmethod
+	def getFromData(cls, activityData):
+		return cls(activityData = activityData)
+
+
+	@classmethod
+	def getFromId(cls, activityId):
+		return cls(activityId = activityId)
+
+	def __str__(self):
+		return '%s\n\tId = %d\n\tType = %s\n\tTime = %s\n\tDistance = %.2f km\n\tDuration: %.0f min\n\tCoordinates = (%5.5f, %5.5f)' % (
+				self.name,
+				self.activityId,
+				self.activityType,
+				self.beginTime,
+				self.distance,
+				self.duration / 60,
+				self.beginCoordinates[0],
+				self.beginCoordinates[1])
+
 
 	@staticmethod
 	def extractTime(data, prefix):
@@ -78,6 +127,7 @@ class Activity:
 		time = time.astimezone(pytz.timezone(timestamp['uom']))
 		return time
 
+
 	@staticmethod
 	def extractCoordinates(data, prefix):
 		prefix = prefix.capitalize()
@@ -87,13 +137,33 @@ class Activity:
 		longitude = float(data['activitySummary'][prefix+'Longitude']['value'])
 		return (latitude, longitude)
 
-	def __init__(self, data):
-		self.activityId       = data['activityId']
-		self.activityType     = data['activityType']['key']
-		self.beginTime        = self.extractTime(data, 'begin')
-		self.endTime          = self.extractTime(data, 'end'  )
-		self.beginCoordinates = self.extractCoordinates(data, 'begin')
-		self.endCoordinates   = self.extractCoordinates(data, 'end')
+
+	def update(self):
+		self.__init__(activityId = self.activityId)
+
+
+	def rename(self, name):
+		"""Rename an activity.
+
+		@ivar name: New activity name
+		@type name: str
+		"""
+		params = {
+			'value' : name
+		}
+		params = urllib.urlencode(params)
+		output = urllib2.urlopen(ActivityService + 'name/%d' % self.activityId, params)
+		output = json.loads(output.read())
+		if output['display']['value'] != name:
+			raise Exception('Naming activity has failed')
+		self.update()
+
+
+	def getUrl(self):
+		"""Get the activity's URL."""
+		return 'https://connect.garmin.com/activity/%d' % self.activityId
+
+
 
 class UploadGarmin:
 	"""Interface to upload activities to Garmin Connect."""
@@ -230,7 +300,7 @@ class UploadGarmin:
 			if len(output['results']['activities']) > 0:
 				for item in output['results']['activities']:
 #					pprint(item['activity'])
-					activities.append(Activity(item['activity']))
+					activities.append(Activity.getFromData(item['activity']))
 			else:
 				break
 			start += limit
@@ -239,37 +309,4 @@ class UploadGarmin:
 	def printActivities(self):
 		activities = self.getActivities()
 		for (index, activity) in enumerate(activities):
-			print '%d: Id = %d, Type = %s, Time = %s, Coordinates = (%5.5f, %5.5f)' % (
-					index,
-					activity.activityId,
-					activity.activityType,
-					activity.beginTime,
-					activity.beginCoordinates[0],
-					activity.beginCoordinates[1])
-
-	def name_workout(self, workout_id, workout_name):
-		"""Name a workout.
-
-		You need to be logged already.
-
-		@ivar workout_id: Workout ID to rename
-		@type workout_id: int
-		@ivar workout_name: New workout name
-		@type workout_name: str
-		"""
-		params = dict(value=workout_name)
-		params = urllib.urlencode(params)
-		output = self.opener.open('http://connect.garmin.com/proxy/activity-service-1.0/json/name/%d' % (workout_id), params)
-		json = output.read()
-		output.close()
-
-		if simplejson.loads(json)["display"]["value"] != workout_name:
-			raise Exception("Naming workout has failed")
-
-	def workout_url(self, workout_id):
-		"""Get the workout URL.
-
-		@ivar workout_id: Workout ID
-		@type workout_id: int
-		"""
-		return "http://connect.garmin.com/activity/" % (int(workout_id))
+			print '%d: %s' % (index, activity)

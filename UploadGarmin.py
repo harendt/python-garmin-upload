@@ -37,10 +37,6 @@
 import urllib2
 import urllib
 import MultipartPostHandler
-try:
-	import simplejson
-except ImportError:
-	import json as simplejson
 import json
 import os.path
 import datetime
@@ -168,16 +164,17 @@ class Activity:
 class UploadGarmin:
 	"""Interface to upload activities to Garmin Connect."""
 
-	userId = -1
-	userName = ''
 
 	def __init__(self):
+		self.userId = -1
+		self.userName = ''
 		# see: http://docs.python.org/2/library/urllib2.html#urllib2.build_opener
 		self.opener = urllib2.build_opener(
 				urllib2.HTTPCookieProcessor(),
 				MultipartPostHandler.MultipartPostHandler)
 		# see: http://docs.python.org/2/library/urllib2.html#urllib2.install_opener
 		urllib2.install_opener(self.opener)
+
 
 	def signIn(self, user, password):
 		"""Sign in to Garmin Connect.
@@ -263,7 +260,7 @@ class UploadGarmin:
 		print 'Uploading file "%s"' % filename
 		try:
 			output = self.opener.open(UploadService + 'upload/' + fileExtension, params)
-			output = simplejson.loads(output.read())
+			output = json.loads(output.read())
 			successes = output['detailedImportResult']['successes']
 			failures  = output['detailedImportResult']['failures']
 		except Exception as e:
@@ -289,6 +286,7 @@ class UploadGarmin:
 		print 'Upload failed unexpectedly'
 		return False, -1
 
+
 	def getActivities(self):
 		"""Retrieve a list of activities."""
 		activities = []
@@ -305,6 +303,7 @@ class UploadGarmin:
 				break
 			start += limit
 		return activities
+
 
 	def printActivities(self):
 		activities = self.getActivities()

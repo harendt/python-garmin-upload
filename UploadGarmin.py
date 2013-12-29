@@ -51,6 +51,7 @@ UserService = BaseUrl + 'proxy/user-service-1.0/json/'
 UploadService = BaseUrl + 'proxy/upload-service-1.1/json/'
 ActivitySearchService = BaseUrl + 'proxy/activity-search-service-1.2/json/'
 ActivityService = BaseUrl + 'proxy/activity-service-1.3/json/'
+GoogleGeocoding = 'https://maps.googleapis.com/maps/api/geocode/json'
 
 class Activity:
 
@@ -76,6 +77,14 @@ class Activity:
 		self.beginCoordinates = self.extractCoordinates(activityData, 'begin')
 		self.endCoordinates   = self.extractCoordinates(activityData, 'end')
 
+		# begin and end geocodes
+		self.beginGeocode = self.getGeocode(self.beginCoordinates)
+		self.endGeocode   = self.getGeocode(self.endCoordinates)
+		if self.beginGeocode == self.endGeocode:
+			self.geocode = self.beginGeocode
+		else:
+			self.geocode = self.beginGeocode + ' - ' + self.endGeocode
+
 		# distance in kilometers and duration in seconds
 		self.distance = float(activityData['activitySummary']['SumDistance']['value'])
 		self.duration = float(activityData['activitySummary']['SumDuration']['value'])
@@ -91,11 +100,12 @@ class Activity:
 		return cls(activityId = activityId)
 
 	def __str__(self):
-		return '%s\n\tId = %d\n\tType = %s\n\tTime = %s\n\tDistance = %.2f km\n\tDuration: %.0f min\n\tCoordinates = (%5.5f, %5.5f)' % (
+		return '%s\n\tId = %d\n\tType = %s\n\tTime = %s\n\tGeocode = %s\n\tDistance = %.2f km\n\tDuration: %.0f min\n\tCoordinates = (%5.5f, %5.5f)' % (
 				self.name,
 				self.activityId,
 				self.activityType,
 				self.beginTime,
+				self.geocode,
 				self.distance,
 				self.duration / 60,
 				self.beginCoordinates[0],
@@ -158,6 +168,22 @@ class Activity:
 	def getUrl(self):
 		"""Get the activity's URL."""
 		return 'https://connect.garmin.com/activity/%d' % self.activityId
+
+
+	@staticmethod
+	def getGeocode(coordinates):
+		output = urllib2.urlopen(GoogleGeocoding + '?latlng=%.6f,%.6f&sensor=true' % coordinates)
+		output = json.loads(output.read())
+		if output['status'] != 'OK' or len(output['results']) == 0:
+			raise Exception('Failed to retrieve geocode data for the coordinates (%.6f, %.6f)' % coordinates)
+		# select the most specific political geocode
+		# see: https://developers.google.com/maps/documentation/geocoding/#ReverseGeocoding
+		geocode = None
+		for item in output['results'][0]['address_components']:
+			if 'political' in item['types']:
+				geocode = item['long_name']
+				break
+		return geocode
 
 
 

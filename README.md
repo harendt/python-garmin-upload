@@ -13,6 +13,12 @@ See the headers of the respective files for details about licensing.
 * MultipartPostHandler.py: LGPL
 
 
+Requirements
+------------
+
+pytz
+
+
 Example
 -------
 
@@ -27,8 +33,11 @@ g = UploadGarmin.UploadGarmin()
 g.signIn("username", "password")
 
 # Upload file
-wId = g.upload_ctx('/tmp/a.ctx')
+success, activityId = g.uploadFile('/path/to/file/activity.fit')
 
-# Name last workout
-g.name_workout(wId, "TestWorkout")
+# print all activities
+g.printActivities()
+
+# retrieve a list of activities
+activities = g.getActivities()
 ```

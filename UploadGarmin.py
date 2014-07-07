@@ -34,6 +34,7 @@
 
 """Upload activities to Garmin Connect."""
 
+import re
 import urllib2
 import urllib
 import MultipartPostHandler
@@ -75,20 +76,35 @@ class UploadGarmin:
 		# it seems that all of the following parameters are required for a
 		# successful login
 		params = {
-				'login' : 'login',
-				'login:loginUsernameField' : user,
-				'login:password' : password,
-				'login:signInButton' : 'Sign In',
-				'javax.faces.ViewState' : 'j_id1'
+				'username'            : user,
+				'password'            : password,
+				'embed'               : 'true',
+				'lt'                  : 'e1s1',
+				'_eventId'            : 'submit',
+				'displayNameRequired' : 'false',
 		}
 		params = urllib.urlencode(params)
 
+		# Garmin Connect changed it's login procedure
+		# see http://stackoverflow.com/questions/22543338/c-sharp-login-to-garmin-connect-new-auth-scheme
+
+#		loginUrl = 'https://sso.garmin.com/sso/login?service=http%3A%2F%2Fconnect.garmin.com%2Fpost-auth%2Flogin&webhost=olaxpw-connect08.garmin.com&source=http%3A%2F%2Fconnect.garmin.com%2Fen-US%2Fsignin&redirectAfterAccountLoginUrl=http%3A%2F%2Fconnect.garmin.com%2Fpost-auth%2Flogin&redirectAfterAccountCreationUrl=http%3A%2F%2Fconnect.garmin.com%2Fpost-auth%2Flogin&gauthHost=https%3A%2F%2Fsso.garmin.com%2Fsso&locale=en&id=gauth-widget&cssUrl=https%3A%2F%2Fstatic.garmincdn.com%2Fcom.garmin.connect%2Fui%2Fsrc-css%2Fgauth-custom.css&clientId=GarminConnect&rememberMeShown=true&rememberMeChecked=false&createAccountShown=true&openCreateAccount=false&usernameShown=true&displayNameShown=false&consumeServiceTicket=false&initialFocus=true&embedWidget=false'
+		loginUrl = 'https://sso.garmin.com/sso/login?service=http%3A%2F%2Fconnect.garmin.com%2Fpost-auth%2Flogin&gauthHost=https%3A%2F%2Fsso.garmin.com%2Fsso&id=gauth-widget&clientId=GarminConnect'
+
 		try:
 			# open the sign in page once (required for a successful login)
-			self.opener.open(BaseUrl + 'signin').read()
+			self.opener.open(loginUrl)
 
 			# send login parameters
-			self.opener.open(BaseUrl + 'signin', params)
+			output = self.opener.open(loginUrl, params).read()
+			match = re.search(
+					'^\s*var\s+response_url\s+=\s+\'(http.*)\';\s*$',
+					output, re.MULTILINE)
+			if match:
+				responseUrl = match.group(1)
+			else:
+				raise Exception('failed to parse response from login form')
+			self.opener.open(responseUrl)
 
 			# read the current username (if login succeeds this returns a JSON with
 			# the username -- something like {"username":"fred"}; otherwise this
